@@ -6,6 +6,7 @@ import {
 } from "react";
 import type { ChangeEvent } from "react";
 
+import Dashboard from "./components/Dashboard/Dashboard";
 import TaskList from "./components/TaskList/TaskList";
 import TaskForm from "./components/TaskForm/TaskForm";
 import TaskFilter from "./components/TaskFilter/TaskFilter";
@@ -25,7 +26,13 @@ import {
 
 import "./App.css";
 
-// Sample tasks
+// Use separate storage keys for tasks and theme preferences.
+const TASK_STORAGE_KEY = "task-dashboard-tasks";
+const THEME_STORAGE_KEY = "task-dashboard-theme";
+
+type Theme = "light" | "dark";
+
+// Provide example tasks when no saved tasks are available.
 const initialTasks: Task[] = [
   {
     id: "1",
@@ -59,7 +66,7 @@ const initialTasks: Task[] = [
   },
 ];
 
-// Default search, filtering, and sorting settings.
+// Set the initial filtering and sorting preferences.
 const initialFilters: TaskFilters = {
   status: "all",
   priority: "all",
@@ -67,18 +74,15 @@ const initialFilters: TaskFilters = {
   sortBy: "dueDate-asc",
 };
 
-const STORAGE_KEY = "task-dashboard-tasks";
-
 function App() {
-  // Load previously saved tasks when the application starts.
+  // Load saved tasks and validate their structure.
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
-      const savedTasks = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(TASK_STORAGE_KEY);
 
-      if (savedTasks !== null) {
-        const parsed: unknown = JSON.parse(savedTasks);
+      if (saved !== null) {
+        const parsed: unknown = JSON.parse(saved);
 
-        // Validate saved data before using it.
         if (isTaskArray(parsed)) {
           return parsed;
         }
@@ -90,24 +94,35 @@ function App() {
     return initialTasks;
   });
 
-  // Manage filters and the task currently being edited.
+  // Manage task filters and editing state.
   const [filters, setFilters] =
     useState<TaskFilters>(initialFilters);
 
   const [editingTask, setEditingTask] =
     useState<Task | null>(null);
 
-  // Reference the hidden file input used for importing JSON.
+  // Restore the user's previously selected theme.
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) === "dark"
+        ? "dark"
+        : "light";
+    } catch {
+      return "light";
+    }
+  });
+
+  // Access the hidden file input used for JSON imports.
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Display feedback after importing or exporting tasks.
+  // Display feedback after task operations.
   const [message, setMessage] = useState("");
 
-  // Save tasks whenever the task array changes.
+  // Persist task changes in localStorage.
   useEffect(() => {
     try {
       localStorage.setItem(
-        STORAGE_KEY,
+        TASK_STORAGE_KEY,
         JSON.stringify(tasks)
       );
     } catch (error) {
@@ -115,7 +130,21 @@ function App() {
     }
   }, [tasks]);
 
-  // Calculate visible tasks without modifying the original array.
+  // Apply the selected theme and save the preference.
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      "data-theme",
+      theme
+    );
+
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (error) {
+      console.error("Unable to save theme:", error);
+    }
+  }, [theme]);
+
+  // Filter and sort tasks without changing the original array.
   const visibleTasks = useMemo(
     () =>
       sortTasks(
@@ -125,7 +154,7 @@ function App() {
     [tasks, filters]
   );
 
-  // Create a new task or update an existing task.
+  // Create a new task or update the selected task.
   const handleSubmit = (data: TaskFormData) => {
     if (editingTask) {
       setTasks((previous) =>
@@ -156,7 +185,7 @@ function App() {
     setMessage("Task added successfully.");
   };
 
-  // Update the status of a selected task.
+  // Update a task's status.
   const handleStatusChange = (
     id: string,
     status: TaskStatus
@@ -170,7 +199,7 @@ function App() {
     );
   };
 
-  // Remove a task from the dashboard.
+  // Delete a task and clear the editing state if necessary.
   const handleDelete = (id: string) => {
     setTasks((previous) =>
       previous.filter((task) => task.id !== id)
@@ -183,7 +212,7 @@ function App() {
     setMessage("Task deleted.");
   };
 
-  // Move a task up or down in its manually assigned order.
+  // Reorder tasks by swapping their manual positions.
   const handleMove = (
     id: string,
     direction: "up" | "down"
@@ -202,7 +231,7 @@ function App() {
           ? index - 1
           : index + 1;
 
-      // Prevent movement outside the task list.
+      // Do nothing if the task cannot move further.
       if (
         index < 0 ||
         nextIndex < 0 ||
@@ -211,13 +240,13 @@ function App() {
         return previous;
       }
 
-      // Swap neighboring tasks.
+      // Exchange the positions of neighboring tasks.
       [ordered[index], ordered[nextIndex]] = [
         ordered[nextIndex],
         ordered[index],
       ];
 
-      // Reassign order numbers after moving tasks.
+      // Assign sequential order values after the swap.
       return ordered.map((task, position) => ({
         ...task,
         order: position,
@@ -225,14 +254,13 @@ function App() {
     });
   };
 
-  // Export all tasks as a downloadable JSON backup.
+  // Export all tasks to a downloadable JSON file.
   const handleExport = () => {
     try {
-      const json = JSON.stringify(tasks, null, 2);
-
-      const blob = new Blob([json], {
-        type: "application/json",
-      });
+      const blob = new Blob(
+        [JSON.stringify(tasks, null, 2)],
+        { type: "application/json" }
+      );
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -244,7 +272,7 @@ function App() {
       link.click();
       link.remove();
 
-      // Release the temporary object URL.
+      // Release the temporary download URL.
       window.setTimeout(() => {
         URL.revokeObjectURL(url);
       }, 1000);
@@ -256,7 +284,7 @@ function App() {
     }
   };
 
-  // Import tasks from a JSON file after validating its structure.
+  // Import task data from a valid JSON backup.
   const handleImport = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
@@ -268,12 +296,11 @@ function App() {
       const contents = await file.text();
       const parsed: unknown = JSON.parse(contents);
 
-      // Reject files that do not contain valid task objects.
+      // Validate the file before replacing existing tasks.
       if (!isTaskArray(parsed)) {
         throw new Error("Invalid task data format.");
       }
 
-      // Import replaces the existing task list.
       const confirmed = window.confirm(
         "Importing will replace your current tasks. Continue?"
       );
@@ -292,51 +319,36 @@ function App() {
         "Import failed. Please select a valid task backup."
       );
     } finally {
-      // Allow the same file to be selected again.
+      // Reset the input to allow importing the same file again.
       event.target.value = "";
     }
   };
 
-  // Calculate statistics from the full task list.
-  const completed = tasks.filter(
-    (task) => task.status === "completed"
-  ).length;
-
-  const inProgress = tasks.filter(
-    (task) => task.status === "in-progress"
-  ).length;
-
-  const pending = tasks.filter(
-    (task) => task.status === "pending"
-  ).length;
+  // Switch between light and dark mode.
+  const handleThemeToggle = () => {
+    setTheme((previous) =>
+      previous === "light" ? "dark" : "light"
+    );
+  };
 
   return (
-    <main className="app-container">
-      {/* Dashboard heading */}
-      <header className="app-header">
-        <h1>Task Management Dashboard</h1>
-        <p>
-          Stay organized and keep track of your progress.
-        </p>
-      </header>
-
-      {/* JSON import and export controls */}
+    <Dashboard
+      tasks={tasks}
+      theme={theme}
+      onThemeToggle={handleThemeToggle}
+    >
+      {/* JSON backup controls */}
       <section
         className="data-actions"
         aria-label="Task data management"
       >
-        <button
-          type="button"
-          onClick={handleExport}
-        >
+        <button type="button" onClick={handleExport}>
           Export Tasks
         </button>
 
         <button
           type="button"
-          onClick={() =>
-            fileInputRef.current?.click()
-          }
+          onClick={() => fileInputRef.current?.click()}
         >
           Import Tasks
         </button>
@@ -351,61 +363,29 @@ function App() {
         />
       </section>
 
-      {/* Announce task operation feedback */}
+      {/* Display task operation feedback. */}
       {message && (
         <p className="action-message" role="status">
           {message}
         </p>
       )}
 
-      {/* Dashboard task statistics */}
-      <section className="stats-grid">
-        {[
-          {
-            label: "Total Tasks",
-            value: tasks.length,
-          },
-          {
-            label: "Completed",
-            value: completed,
-          },
-          {
-            label: "In Progress",
-            value: inProgress,
-          },
-          {
-            label: "Pending",
-            value: pending,
-          },
-        ].map((stat) => (
-          <div
-            className="stat-card"
-            key={stat.label}
-          >
-            <h2>{stat.label}</h2>
-            <p>{stat.value}</p>
-          </div>
-        ))}
-      </section>
-
-      {/* Controlled form for adding and editing tasks */}
+      {/* Task creation and editing form */}
       <TaskForm
         editingTask={editingTask}
         onSubmit={handleSubmit}
         onCancel={() => setEditingTask(null)}
       />
 
-      {/* Task search, filtering, and sorting */}
+      {/* Search, filtering, and sorting controls */}
       <TaskFilter
         filters={filters}
         onFilterChange={setFilters}
       />
 
-      {/* Render the filtered task list */}
+      {/* Display tasks matching the current filters. */}
       <section className="task-section">
-        <h2>
-          Your Tasks ({visibleTasks.length})
-        </h2>
+        <h2>Your Tasks ({visibleTasks.length})</h2>
 
         <TaskList
           tasks={visibleTasks}
@@ -415,7 +395,7 @@ function App() {
           onMove={handleMove}
         />
       </section>
-    </main>
+    </Dashboard>
   );
 }
 
