@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { ChangeEvent } from "react";
+
 import TaskList from "./components/TaskList/TaskList";
 import TaskForm from "./components/TaskForm/TaskForm";
 import TaskFilter from "./components/TaskFilter/TaskFilter";
@@ -18,7 +25,7 @@ import {
 
 import "./App.css";
 
-// Sample tasks displayed when no saved data exists.
+// Sample tasks
 const initialTasks: Task[] = [
   {
     id: "1",
@@ -52,7 +59,7 @@ const initialTasks: Task[] = [
   },
 ];
 
-// Default filtering and sorting settings.
+// Default search, filtering, and sorting settings.
 const initialFilters: TaskFilters = {
   status: "all",
   priority: "all",
@@ -60,16 +67,15 @@ const initialFilters: TaskFilters = {
   sortBy: "dueDate-asc",
 };
 
+const STORAGE_KEY = "task-dashboard-tasks";
+
 function App() {
-  // Load tasks from localStorage when the application starts.
-  // If no valid saved data exists, use the sample tasks.
+  // Load previously saved tasks when the application starts.
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
-      const savedTasks = localStorage.getItem(
-        "task-dashboard-tasks"
-      );
+      const savedTasks = localStorage.getItem(STORAGE_KEY);
 
-      if (savedTasks) {
+      if (savedTasks !== null) {
         const parsed: unknown = JSON.parse(savedTasks);
 
         // Validate saved data before using it.
@@ -84,20 +90,24 @@ function App() {
     return initialTasks;
   });
 
-  // Manage filtering, sorting, and the currently edited task.
-  const [filters, setFilters] = useState<TaskFilters>(
-    initialFilters
-  );
+  // Manage filters and the task currently being edited.
+  const [filters, setFilters] =
+    useState<TaskFilters>(initialFilters);
 
-  const [editingTask, setEditingTask] = useState<Task | null>(
-    null
-  );
+  const [editingTask, setEditingTask] =
+    useState<Task | null>(null);
 
-  // Automatically save tasks whenever the task array changes.
+  // Reference the hidden file input used for importing JSON.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Display feedback after importing or exporting tasks.
+  const [message, setMessage] = useState("");
+
+  // Save tasks whenever the task array changes.
   useEffect(() => {
     try {
       localStorage.setItem(
-        "task-dashboard-tasks",
+        STORAGE_KEY,
         JSON.stringify(tasks)
       );
     } catch (error) {
@@ -105,14 +115,17 @@ function App() {
     }
   }, [tasks]);
 
-  // Filter and sort tasks without modifying the original array.
-  // useMemo recalculates only when tasks or filters change.
+  // Calculate visible tasks without modifying the original array.
   const visibleTasks = useMemo(
-    () => sortTasks(filterTasks(tasks, filters), filters.sortBy),
+    () =>
+      sortTasks(
+        filterTasks(tasks, filters),
+        filters.sortBy
+      ),
     [tasks, filters]
   );
 
-  // Add a new task or update an existing task.
+  // Create a new task or update an existing task.
   const handleSubmit = (data: TaskFormData) => {
     if (editingTask) {
       setTasks((previous) =>
@@ -124,45 +137,53 @@ function App() {
       );
 
       setEditingTask(null);
+      setMessage("Task updated successfully.");
       return;
     }
 
-    // Generate an ID, creation date, and order for new tasks.
     const newTask: Task = {
       ...data,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
-      order: Math.max(-1, ...tasks.map((task) => task.order)) + 1,
+      order:
+        Math.max(
+          -1,
+          ...tasks.map((task) => task.order)
+        ) + 1,
     };
 
     setTasks((previous) => [...previous, newTask]);
+    setMessage("Task added successfully.");
   };
 
-  // Update a task's status without mutating React state.
+  // Update the status of a selected task.
   const handleStatusChange = (
     id: string,
     status: TaskStatus
   ) => {
     setTasks((previous) =>
       previous.map((task) =>
-        task.id === id ? { ...task, status } : task
+        task.id === id
+          ? { ...task, status }
+          : task
       )
     );
   };
 
-  // Delete a task by its ID.
+  // Remove a task from the dashboard.
   const handleDelete = (id: string) => {
     setTasks((previous) =>
       previous.filter((task) => task.id !== id)
     );
 
-    // Stop editing if the deleted task was selected.
     if (editingTask?.id === id) {
       setEditingTask(null);
     }
+
+    setMessage("Task deleted.");
   };
 
-  // Move a task up or down in its original order.
+  // Move a task up or down in its manually assigned order.
   const handleMove = (
     id: string,
     direction: "up" | "down"
@@ -177,9 +198,11 @@ function App() {
       );
 
       const nextIndex =
-        direction === "up" ? index - 1 : index + 1;
+        direction === "up"
+          ? index - 1
+          : index + 1;
 
-      // Prevent moving outside the list boundaries.
+      // Prevent movement outside the task list.
       if (
         index < 0 ||
         nextIndex < 0 ||
@@ -188,13 +211,13 @@ function App() {
         return previous;
       }
 
-      // Swap the selected task with its neighbor.
+      // Swap neighboring tasks.
       [ordered[index], ordered[nextIndex]] = [
         ordered[nextIndex],
         ordered[index],
       ];
 
-      // Reassign order values after the swap.
+      // Reassign order numbers after moving tasks.
       return ordered.map((task, position) => ({
         ...task,
         order: position,
@@ -202,7 +225,79 @@ function App() {
     });
   };
 
-  // Calculate dashboard statistics from the task array.
+  // Export all tasks as a downloadable JSON backup.
+  const handleExport = () => {
+    try {
+      const json = JSON.stringify(tasks, null, 2);
+
+      const blob = new Blob([json], {
+        type: "application/json",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "task-dashboard-backup.json";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      // Release the temporary object URL.
+      window.setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
+
+      setMessage("Task backup exported successfully.");
+    } catch (error) {
+      console.error("Unable to export tasks:", error);
+      setMessage("Unable to export tasks.");
+    }
+  };
+
+  // Import tasks from a JSON file after validating its structure.
+  const handleImport = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    try {
+      const contents = await file.text();
+      const parsed: unknown = JSON.parse(contents);
+
+      // Reject files that do not contain valid task objects.
+      if (!isTaskArray(parsed)) {
+        throw new Error("Invalid task data format.");
+      }
+
+      // Import replaces the existing task list.
+      const confirmed = window.confirm(
+        "Importing will replace your current tasks. Continue?"
+      );
+
+      if (!confirmed) {
+        setMessage("Import canceled.");
+        return;
+      }
+
+      setTasks(parsed);
+      setEditingTask(null);
+      setMessage("Tasks imported successfully.");
+    } catch (error) {
+      console.error("Unable to import tasks:", error);
+      setMessage(
+        "Import failed. Please select a valid task backup."
+      );
+    } finally {
+      // Allow the same file to be selected again.
+      event.target.value = "";
+    }
+  };
+
+  // Calculate statistics from the full task list.
   const completed = tasks.filter(
     (task) => task.status === "completed"
   ).length;
@@ -220,40 +315,97 @@ function App() {
       {/* Dashboard heading */}
       <header className="app-header">
         <h1>Task Management Dashboard</h1>
-        <p>Stay organized and keep track of your progress.</p>
+        <p>
+          Stay organized and keep track of your progress.
+        </p>
       </header>
 
-      {/* Task statistics */}
+      {/* JSON import and export controls */}
+      <section
+        className="data-actions"
+        aria-label="Task data management"
+      >
+        <button
+          type="button"
+          onClick={handleExport}
+        >
+          Export Tasks
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            fileInputRef.current?.click()
+          }
+        >
+          Import Tasks
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleImport}
+          aria-label="Select a task backup file"
+          style={{ display: "none" }}
+        />
+      </section>
+
+      {/* Announce task operation feedback */}
+      {message && (
+        <p className="action-message" role="status">
+          {message}
+        </p>
+      )}
+
+      {/* Dashboard task statistics */}
       <section className="stats-grid">
         {[
-          { label: "Total Tasks", value: tasks.length },
-          { label: "Completed", value: completed },
-          { label: "In Progress", value: inProgress },
-          { label: "Pending", value: pending },
+          {
+            label: "Total Tasks",
+            value: tasks.length,
+          },
+          {
+            label: "Completed",
+            value: completed,
+          },
+          {
+            label: "In Progress",
+            value: inProgress,
+          },
+          {
+            label: "Pending",
+            value: pending,
+          },
         ].map((stat) => (
-          <div className="stat-card" key={stat.label}>
+          <div
+            className="stat-card"
+            key={stat.label}
+          >
             <h2>{stat.label}</h2>
             <p>{stat.value}</p>
           </div>
         ))}
       </section>
 
-      {/* Form for creating and editing tasks */}
+      {/* Controlled form for adding and editing tasks */}
       <TaskForm
         editingTask={editingTask}
         onSubmit={handleSubmit}
         onCancel={() => setEditingTask(null)}
       />
 
-      {/* Search, filtering, and sorting controls */}
+      {/* Task search, filtering, and sorting */}
       <TaskFilter
         filters={filters}
         onFilterChange={setFilters}
       />
 
-      {/* Display the filtered task list */}
+      {/* Render the filtered task list */}
       <section className="task-section">
-        <h2>Your Tasks ({visibleTasks.length})</h2>
+        <h2>
+          Your Tasks ({visibleTasks.length})
+        </h2>
 
         <TaskList
           tasks={visibleTasks}

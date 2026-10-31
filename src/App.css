@@ -1,11 +1,12 @@
-/* Main dashboard layout */
+/* Main Dashboard Layout */
+
 .app-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
 }
 
-/* Header */
+/* Dashboard header */
 .app-header {
   text-align: center;
   margin-bottom: 36px;
@@ -20,7 +21,54 @@
   color: #64748b;
 }
 
-/* Statistics cards */
+/* Data and Export */
+
+/* Arrange backup buttons horizontally. */
+.data-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* Style import and export buttons. */
+.data-actions button {
+  padding: 12px 20px;
+  background-color: #2563eb;
+  color: white;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.data-actions button:hover {
+  background-color: #1d4ed8;
+}
+
+.data-actions button:active {
+  transform: scale(0.97);
+}
+
+/* Display feedback after task operations. */
+.action-message {
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Dashboard Statistics */
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -28,6 +76,7 @@
   margin-bottom: 40px;
 }
 
+/* Individual statistics cards */
 .stat-card {
   background: white;
   padding: 24px;
@@ -47,25 +96,32 @@
   margin-bottom: 0;
 }
 
-/* Task list */
+/* Task List and Cards */
+
 .task-section h2 {
   margin-bottom: 20px;
 }
 
+/* Responsive grid for task cards. */
 .task-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  grid-template-columns:
+    repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 20px;
 }
 
+/* Individual task card */
 .task-card {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 20px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
+/* Subtle lift animation when hovering. */
 .task-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
@@ -75,7 +131,16 @@
   margin-top: 0;
 }
 
-/* Priority indicators */
+/* Task card heading and priority label */
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Task Priority Indicators */
+
 .priority-high {
   color: #dc2626;
   font-weight: bold;
@@ -91,47 +156,8 @@
   font-weight: bold;
 }
 
-/* Form controls */
-.task-card select {
-  margin: 10px;
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-}
+/* Task Form and Filter Panels */
 
-/* Delete button */
-.delete-button {
-  background: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 9px 14px;
-  cursor: pointer;
-}
-
-.delete-button:hover {
-  background: #b91c1c;
-}
-
-/* Responsive layout */
-@media (max-width: 800px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .app-header h1 {
-    font-size: 1.8rem;
-  }
-}
-
-
-/* Task creation and editing form */
 .task-form,
 .filter-panel {
   background: white;
@@ -141,6 +167,7 @@
   margin-bottom: 28px;
 }
 
+/* Form labels */
 .task-form label,
 .filter-panel label {
   display: block;
@@ -148,6 +175,7 @@
   font-weight: 600;
 }
 
+/* Shared input styling */
 .task-form input,
 .task-form textarea,
 .task-form select,
@@ -161,24 +189,28 @@
   color: #1e293b;
 }
 
+/* Allow users to resize task descriptions. */
 .task-form textarea {
   min-height: 90px;
   resize: vertical;
 }
 
-.form-row,
-.filter-grid {
+/* Two-column task form layout */
+.form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
+/* Four-column filter layout */
 .filter-grid {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.filter-heading,
-.task-card-header {
+/* Filter heading and active filter count */
+.filter-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -189,6 +221,8 @@
   color: #64748b;
 }
 
+/* Form and Task Action Buttons */
+
 .form-actions,
 .task-actions {
   display: flex;
@@ -197,6 +231,7 @@
   margin-top: 18px;
 }
 
+/* Shared button styling */
 .form-actions button,
 .task-actions button,
 .filter-panel button {
@@ -206,39 +241,14 @@
   cursor: pointer;
 }
 
+/* Primary submit button */
 .form-actions button:first-child {
   background: #2563eb;
   color: white;
   border-color: #2563eb;
 }
 
-.form-error {
-  color: #dc2626;
-  font-size: 0.9rem;
-}
-
-.empty-message {
-  padding: 24px;
-  background: white;
-  border-radius: 8px;
-  text-align: center;
-}
-
-@media (max-width: 800px) {
-  .filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 480px) {
-
-  .form-row,
-  .filter-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Keep the delete button red inside the task actions */
+/* Delete button */
 .task-actions .delete-button {
   background-color: #dc2626;
   border-color: #dc2626;
@@ -249,13 +259,7 @@
   background-color: #b91c1c;
 }
 
-/* Improve task status dropdown alignment */
-.task-card select {
-  margin: 8px 0;
-  max-width: 100%;
-}
-
-/* Give action buttons visual feedback */
+/* Interactive button feedback */
 .task-actions button:hover,
 .form-actions button:hover {
   filter: brightness(0.92);
@@ -264,4 +268,89 @@
 .task-actions button:active,
 .form-actions button:active {
   transform: scale(0.97);
+}
+
+/* Task Status Controls */
+
+.task-card select {
+  margin: 8px 0;
+  padding: 8px;
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+/* Validation and Empty States */
+
+/* Display form validation errors. */
+.form-error {
+  color: #dc2626;
+  font-size: 0.9rem;
+}
+
+/* Display when no tasks match filters. */
+.empty-message {
+  padding: 24px;
+  background: white;
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Responsive Design */
+
+/* Tablet layouts */
+@media (max-width: 800px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile layouts */
+@media (max-width: 480px) {
+  .app-container {
+    padding: 24px 14px;
+  }
+
+  .app-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row,
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-form,
+  .filter-panel {
+    padding: 18px;
+  }
+
+  /* Make backup buttons easier to tap on mobile. */
+  .data-actions {
+    flex-direction: column;
+  }
+
+  .data-actions button {
+    width: 100%;
+  }
+}
+
+/* Respect reduced-motion accessibility preferences. */
+@media (prefers-reduced-motion: reduce) {
+  .task-card,
+  .data-actions button {
+    transition: none;
+  }
+
+  .task-card:hover {
+    transform: none;
+  }
 }
