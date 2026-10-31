@@ -1,3 +1,4 @@
+
 import {
   useEffect,
   useMemo,
@@ -26,13 +27,14 @@ import {
 
 import "./App.css";
 
-// Use separate storage keys for tasks and theme preferences.
+// Store task data and theme preferences under separate keys.
 const TASK_STORAGE_KEY = "task-dashboard-tasks";
 const THEME_STORAGE_KEY = "task-dashboard-theme";
 
+// Restrict the theme to the two supported options.
 type Theme = "light" | "dark";
 
-// Provide example tasks when no saved tasks are available.
+// Display example tasks when no saved data exists.
 const initialTasks: Task[] = [
   {
     id: "1",
@@ -66,59 +68,72 @@ const initialTasks: Task[] = [
   },
 ];
 
-// Set the initial filtering and sorting preferences.
+// Configure the initial search, filter, and sorting settings.
 const initialFilters: TaskFilters = {
   status: "all",
   priority: "all",
   search: "",
-  sortBy: "dueDate-asc",
+  sortBy: "manual",
 };
 
 function App() {
-  // Load saved tasks and validate their structure.
+  // Restore saved tasks from localStorage when the app loads.
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
-      const saved = localStorage.getItem(TASK_STORAGE_KEY);
+      const savedTasks = localStorage.getItem(
+        TASK_STORAGE_KEY
+      );
 
-      if (saved !== null) {
-        const parsed: unknown = JSON.parse(saved);
+      if (savedTasks !== null) {
+        const parsed: unknown = JSON.parse(savedTasks);
 
+        // Only accept data matching the expected Task structure.
         if (isTaskArray(parsed)) {
           return parsed;
         }
       }
     } catch (error) {
-      console.error("Unable to load saved tasks:", error);
+      console.error(
+        "Unable to load saved tasks:",
+        error
+      );
     }
 
     return initialTasks;
   });
 
-  // Manage task filters and editing state.
+  // Track the current filters and selected task for editing.
   const [filters, setFilters] =
     useState<TaskFilters>(initialFilters);
 
   const [editingTask, setEditingTask] =
     useState<Task | null>(null);
 
-  // Restore the user's previously selected theme.
+  // Restore the user's previously selected color theme.
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      return localStorage.getItem(THEME_STORAGE_KEY) === "dark"
-        ? "dark"
-        : "light";
-    } catch {
+      const savedTheme = localStorage.getItem(
+        THEME_STORAGE_KEY
+      );
+
+      return savedTheme === "dark" ? "dark" : "light";
+    } catch (error) {
+      console.error(
+        "Unable to load theme preference:",
+        error
+      );
+
       return "light";
     }
   });
 
-  // Access the hidden file input used for JSON imports.
+  // Reference the hidden input used to upload JSON files.
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Display feedback after task operations.
+  // Display confirmation and error messages.
   const [message, setMessage] = useState("");
 
-  // Persist task changes in localStorage.
+  // Save task changes automatically.
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -126,11 +141,14 @@ function App() {
         JSON.stringify(tasks)
       );
     } catch (error) {
-      console.error("Unable to save tasks:", error);
+      console.error(
+        "Unable to save tasks:",
+        error
+      );
     }
   }, [tasks]);
 
-  // Apply the selected theme and save the preference.
+  // Apply and persist the selected color theme.
   useEffect(() => {
     document.documentElement.setAttribute(
       "data-theme",
@@ -138,25 +156,28 @@ function App() {
     );
 
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      localStorage.setItem(
+        THEME_STORAGE_KEY,
+        theme
+      );
     } catch (error) {
-      console.error("Unable to save theme:", error);
+      console.error(
+        "Unable to save theme preference:",
+        error
+      );
     }
   }, [theme]);
 
-  // Filter and sort tasks without changing the original array.
-  const visibleTasks = useMemo(
-    () =>
-      sortTasks(
-        filterTasks(tasks, filters),
-        filters.sortBy
-      ),
-    [tasks, filters]
-  );
+  // Filter and sort tasks whenever task data or filters change.
+  const visibleTasks = useMemo(() => {
+    const filtered = filterTasks(tasks, filters);
 
-  // Create a new task or update the selected task.
+    return sortTasks(filtered, filters.sortBy);
+  }, [tasks, filters]);
+
+  // Create a task or update an existing task.
   const handleSubmit = (data: TaskFormData) => {
-    if (editingTask) {
+    if (editingTask !== null) {
       setTasks((previous) =>
         previous.map((task) =>
           task.id === editingTask.id
@@ -170,22 +191,29 @@ function App() {
       return;
     }
 
+    // New tasks appear at the end of the manual order.
+    const nextOrder =
+      Math.max(
+        -1,
+        ...tasks.map((task) => task.order)
+      ) + 1;
+
     const newTask: Task = {
       ...data,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
-      order:
-        Math.max(
-          -1,
-          ...tasks.map((task) => task.order)
-        ) + 1,
+      order: nextOrder,
     };
 
-    setTasks((previous) => [...previous, newTask]);
+    setTasks((previous) => [
+      ...previous,
+      newTask,
+    ]);
+
     setMessage("Task added successfully.");
   };
 
-  // Update a task's status.
+  // Update the completion status of a task.
   const handleStatusChange = (
     id: string,
     status: TaskStatus
@@ -197,14 +225,17 @@ function App() {
           : task
       )
     );
+
+    setMessage("Task status updated.");
   };
 
-  // Delete a task and clear the editing state if necessary.
+  // Remove a task from the dashboard.
   const handleDelete = (id: string) => {
     setTasks((previous) =>
       previous.filter((task) => task.id !== id)
     );
 
+    // Close the edit form if its task was deleted.
     if (editingTask?.id === id) {
       setEditingTask(null);
     }
@@ -212,55 +243,103 @@ function App() {
     setMessage("Task deleted.");
   };
 
-  // Reorder tasks by swapping their manual positions.
+  // Move a task up or down in its manually assigned order.
   const handleMove = (
     id: string,
     direction: "up" | "down"
   ) => {
+    // When filters are active, only visible tasks are reordered.
+    // Other tasks keep their relative positions.
+    const currentVisible = sortTasks(
+      filterTasks(tasks, filters),
+      filters.sortBy
+    );
+
+    const currentIndex = currentVisible.findIndex(
+      (task) => task.id === id
+    );
+
+    const targetIndex =
+      direction === "up"
+        ? currentIndex - 1
+        : currentIndex + 1;
+
+    // Ignore moves beyond the visible list boundaries.
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= currentVisible.length
+    ) {
+      return;
+    }
+
+    // Build the new visible order after swapping neighbors.
+    const reorderedVisible = [...currentVisible];
+
+    [
+      reorderedVisible[currentIndex],
+      reorderedVisible[targetIndex],
+    ] = [
+        reorderedVisible[targetIndex],
+        reorderedVisible[currentIndex],
+      ];
+
+    const reorderedIds = reorderedVisible.map(
+      (task) => task.id
+    );
+
     setTasks((previous) => {
+      // Start with the complete saved manual order.
       const ordered = [...previous].sort(
         (a, b) => a.order - b.order
       );
 
-      const index = ordered.findIndex(
-        (task) => task.id === id
+      // Identify slots belonging to currently visible tasks.
+      const visibleIds = new Set(reorderedIds);
+
+      const visibleSlots = ordered
+        .map((task, index) =>
+          visibleIds.has(task.id) ? index : -1
+        )
+        .filter((index) => index >= 0);
+
+      // Place reordered visible tasks into those slots.
+      const taskById = new Map(
+        ordered.map((task) => [task.id, task])
       );
 
-      const nextIndex =
-        direction === "up"
-          ? index - 1
-          : index + 1;
+      visibleSlots.forEach((slot, index) => {
+        const task = taskById.get(reorderedIds[index]);
 
-      // Do nothing if the task cannot move further.
-      if (
-        index < 0 ||
-        nextIndex < 0 ||
-        nextIndex >= ordered.length
-      ) {
-        return previous;
-      }
+        if (task) {
+          ordered[slot] = task;
+        }
+      });
 
-      // Exchange the positions of neighboring tasks.
-      [ordered[index], ordered[nextIndex]] = [
-        ordered[nextIndex],
-        ordered[index],
-      ];
-
-      // Assign sequential order values after the swap.
-      return ordered.map((task, position) => ({
+      // Save the updated sequence with consecutive positions.
+      return ordered.map((task, index) => ({
         ...task,
-        order: position,
+        order: index,
       }));
     });
+
+    // Show the saved order rather than due-date or priority order.
+    setFilters((previous) => ({
+      ...previous,
+      sortBy: "manual",
+    }));
+
+    setMessage("Task order updated.");
   };
 
-  // Export all tasks to a downloadable JSON file.
+  // Download all tasks as a JSON backup.
   const handleExport = () => {
     try {
-      const blob = new Blob(
-        [JSON.stringify(tasks, null, 2)],
-        { type: "application/json" }
-      );
+      const json = JSON.stringify(tasks, null, 2);
+
+      const blob = new Blob([json], {
+        type: "application/json",
+      });
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -272,35 +351,46 @@ function App() {
       link.click();
       link.remove();
 
-      // Release the temporary download URL.
+      // Release the temporary object URL after downloading.
       window.setTimeout(() => {
         URL.revokeObjectURL(url);
       }, 1000);
 
-      setMessage("Task backup exported successfully.");
+      setMessage(
+        "Task backup exported successfully."
+      );
     } catch (error) {
-      console.error("Unable to export tasks:", error);
+      console.error(
+        "Unable to export tasks:",
+        error
+      );
+
       setMessage("Unable to export tasks.");
     }
   };
 
-  // Import task data from a valid JSON backup.
+  // Import tasks from a previously exported JSON file.
   const handleImport = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     try {
       const contents = await file.text();
       const parsed: unknown = JSON.parse(contents);
 
-      // Validate the file before replacing existing tasks.
+      // Reject invalid or incompatible backup files.
       if (!isTaskArray(parsed)) {
-        throw new Error("Invalid task data format.");
+        throw new Error(
+          "The selected file does not contain valid tasks."
+        );
       }
 
+      // Require confirmation before replacing saved tasks.
       const confirmed = window.confirm(
         "Importing will replace your current tasks. Continue?"
       );
@@ -312,19 +402,32 @@ function App() {
 
       setTasks(parsed);
       setEditingTask(null);
-      setMessage("Tasks imported successfully.");
+
+      // Show imported tasks in their saved manual order.
+      setFilters({
+        ...initialFilters,
+        sortBy: "manual",
+      });
+
+      setMessage(
+        "Tasks imported successfully."
+      );
     } catch (error) {
-      console.error("Unable to import tasks:", error);
+      console.error(
+        "Unable to import tasks:",
+        error
+      );
+
       setMessage(
         "Import failed. Please select a valid task backup."
       );
     } finally {
-      // Reset the input to allow importing the same file again.
+      // Allow users to select the same backup again.
       event.target.value = "";
     }
   };
 
-  // Switch between light and dark mode.
+  // Switch between light and dark color themes.
   const handleThemeToggle = () => {
     setTheme((previous) =>
       previous === "light" ? "dark" : "light"
@@ -337,18 +440,23 @@ function App() {
       theme={theme}
       onThemeToggle={handleThemeToggle}
     >
-      {/* JSON backup controls */}
+      {/* Import and export controls */}
       <section
         className="data-actions"
         aria-label="Task data management"
       >
-        <button type="button" onClick={handleExport}>
+        <button
+          type="button"
+          onClick={handleExport}
+        >
           Export Tasks
         </button>
 
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() =>
+            fileInputRef.current?.click()
+          }
         >
           Import Tasks
         </button>
@@ -363,9 +471,12 @@ function App() {
         />
       </section>
 
-      {/* Display task operation feedback. */}
+      {/* Announce feedback to users and assistive technology. */}
       {message && (
-        <p className="action-message" role="status">
+        <p
+          className="action-message"
+          role="status"
+        >
           {message}
         </p>
       )}
@@ -377,15 +488,17 @@ function App() {
         onCancel={() => setEditingTask(null)}
       />
 
-      {/* Search, filtering, and sorting controls */}
+      {/* Search, status, priority, and sorting controls */}
       <TaskFilter
         filters={filters}
         onFilterChange={setFilters}
       />
 
-      {/* Display tasks matching the current filters. */}
+      {/* Display tasks matching the selected filters. */}
       <section className="task-section">
-        <h2>Your Tasks ({visibleTasks.length})</h2>
+        <h2>
+          Your Tasks ({visibleTasks.length})
+        </h2>
 
         <TaskList
           tasks={visibleTasks}

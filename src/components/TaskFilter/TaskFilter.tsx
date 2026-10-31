@@ -1,29 +1,43 @@
 import type {
   TaskFilterProps,
-  TaskPriority,
-  TaskStatus,
-  SortOption,
+  TaskFilters,
 } from "../../types";
 
-// Controlled filters keep App in charge of filter state.
+// Provide controls for searching, filtering, and sorting tasks.
 export default function TaskFilter({
   filters,
   onFilterChange,
 }: TaskFilterProps) {
-  const activeCount = [
-    filters.status !== "all",
-    filters.priority !== "all",
-    filters.search.trim() !== "",
-  ].filter(Boolean).length;
+  // Update a single filter without changing the others.
+  const updateFilter = <K extends keyof TaskFilters>(
+    key: K,
+    value: TaskFilters[K]
+  ) => {
+    onFilterChange({
+      ...filters,
+      [key]: value,
+    });
+  };
+
+  // Reset search and category filters while preserving sorting.
+  const clearFilters = () => {
+    onFilterChange({
+      status: "all",
+      priority: "all",
+      search: "",
+      sortBy: filters.sortBy,
+    });
+  };
 
   return (
     <section className="filter-panel">
       <div className="filter-heading">
-        <h2>Find Tasks</h2>
-        <span>{activeCount} active filters</span>
+        <h2>Filter Tasks</h2>
+        <span>Find and organize your tasks</span>
       </div>
 
       <div className="filter-grid">
+        {/* Search task titles and descriptions. */}
         <div>
           <label htmlFor="task-search">Search</label>
           <input
@@ -32,21 +46,22 @@ export default function TaskFilter({
             placeholder="Search tasks..."
             value={filters.search}
             onChange={(event) =>
-              onFilterChange({ ...filters, search: event.target.value })
+              updateFilter("search", event.target.value)
             }
           />
         </div>
 
+        {/* Filter by completion status. */}
         <div>
-          <label htmlFor="filter-status">Status</label>
+          <label htmlFor="status-filter">Status</label>
           <select
-            id="filter-status"
+            id="status-filter"
             value={filters.status}
             onChange={(event) =>
-              onFilterChange({
-                ...filters,
-                status: event.target.value as TaskStatus | "all",
-              })
+              updateFilter(
+                "status",
+                event.target.value as TaskFilters["status"]
+              )
             }
           >
             <option value="all">All Statuses</option>
@@ -56,16 +71,17 @@ export default function TaskFilter({
           </select>
         </div>
 
+        {/* Filter by priority. */}
         <div>
-          <label htmlFor="filter-priority">Priority</label>
+          <label htmlFor="priority-filter">Priority</label>
           <select
-            id="filter-priority"
+            id="priority-filter"
             value={filters.priority}
             onChange={(event) =>
-              onFilterChange({
-                ...filters,
-                priority: event.target.value as TaskPriority | "all",
-              })
+              updateFilter(
+                "priority",
+                event.target.value as TaskFilters["priority"]
+              )
             }
           >
             <option value="all">All Priorities</option>
@@ -75,42 +91,43 @@ export default function TaskFilter({
           </select>
         </div>
 
+        {/* Select how tasks are displayed. */}
         <div>
-          <label htmlFor="task-sort">Sort By</label>
+          <label htmlFor="sort-filter">Sort By</label>
           <select
-            id="task-sort"
+            id="sort-filter"
             value={filters.sortBy}
             onChange={(event) =>
-              onFilterChange({
-                ...filters,
-                sortBy: event.target.value as SortOption,
-              })
+              updateFilter(
+                "sortBy",
+                event.target.value as TaskFilters["sortBy"]
+              )
             }
           >
-            <option value="dueDate-asc">Due Date: Earliest</option>
-            <option value="dueDate-desc">Due Date: Latest</option>
-            <option value="priority-high">Priority: Highest</option>
-            <option value="priority-low">Priority: Lowest</option>
-            <option value="title-asc">Title: A–Z</option>
+            <option value="manual">Manual Order</option>
+            <option value="dueDate-asc">
+              Due Date: Earliest First
+            </option>
+            <option value="dueDate-desc">
+              Due Date: Latest First
+            </option>
+            <option value="priority-high">
+              Priority: Highest First
+            </option>
+            <option value="priority-low">
+              Priority: Lowest First
+            </option>
+            <option value="title-asc">
+              Title: A to Z
+            </option>
           </select>
         </div>
       </div>
 
-      {activeCount > 0 && (
-        <button
-          type="button"
-          onClick={() =>
-            onFilterChange({
-              ...filters,
-              status: "all",
-              priority: "all",
-              search: "",
-            })
-          }
-        >
-          Clear Filters
-        </button>
-      )}
+      {/* Clear filters without resetting the sort selection. */}
+      <button type="button" onClick={clearFilters}>
+        Clear Filters
+      </button>
     </section>
   );
 }
